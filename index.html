@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>創作者十年變化總結表</title>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@gradio/lite/dist/static/gradio-lite.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gradio/lite/dist/static/style.css" />
+    <style>
+        /* 設置網頁基礎背景色與 Python 代碼一致 */
+        body { background-color: #F4F1EA; margin: 0; padding: 20px; }
+    </style>
+</head>
+<body>
+    <gradio-lite>
+        <gradio-requirements>
+            pillow
+        </gradio-requirements>
+
+        <gradio-file name="app.py" entrypoint>
+import gradio as gr
+from PIL import Image, ImageDraw, ImageFont
+import datetime
+import textwrap
+import io
+import os
+
+# --- 配置參數 (2016-2025) ---
+YEARS = range(2016, 2026)
+YEARS_LEFT = YEARS[:5]
+YEARS_RIGHT = YEARS[5:]
+COLUMNS = 2
+
+# --- 配色方案 (與 word.py 一致) ---
+COLOR_BG_LIGHT = '#F4F1EA'
+COLOR_TEXT_DARK = '#2D4739'
+COLOR_TITLE_DARK = '#121619'
+COLOR_ACCENT_LINE = '#BCB382'
+COLOR_HIGHLIGHT = '#47340C'
+
+def generate_summary_image(*args):
+    """生成總結長圖的核心邏輯"""
+    base_info = {
+        "title": args[0],
+        "creator": args[1],
+        "writer": args[2],
+        "date": args[3]
+    }
+
+    creative_records = {}
+    data_start_index = 4
+    for i, year in enumerate(YEARS):
+        start = data_start_index + i * 4
+        creative_records[year] = {
+            "cp_work": args[start],
+            "style_excerpt": args[start + 1],
+            "major_impact": args[start + 2],
+            "reflection": args[start + 3],
+        }
+
+    W, MARGIN, GUTTER = 1600, 50, 40
+    COLUMN_WIDTH = (W - 2 * MARGIN - GUTTER) // COLUMNS
+    TEXT_WIDTH = COLUMN_WIDTH - 40
+
+    # 瀏覽器環境下默認加載系統字體或 Default
+    font_title = ImageFont.load_default()
+    font_year = ImageFont.load_default()
+    font_header = ImageFont.load_default()
+    font_text = ImageFont.load_default()
+    font_base = ImageFont.load_default()
+
+    line_height = 30
+
+    def get_text_height(text, font, max_width):
+        if not text: return line_height
+        chars_per_line = int(max_width / (20 * 0.9)) # 估算寬度
+        lines = textwrap.wrap(text, width=chars_per_line, replace_whitespace=False)
+        return len(lines) * line_height + 15
+
+    def calculate_year_height(year):
+        record = creative_records[year]
+        h = 50 + 30 + 4 * line_height
+        h += get_text_height(record["cp_work"], font_text, TEXT_WIDTH)
+        h += get_text_height(record["style_excerpt"], font_text, TEXT_WIDTH)
+        h += get_text_height(record["major_impact"], font_text, TEXT_WIDTH)
+        h += get_text_height(record["reflection"], font_text, TEXT_WIDTH)
+        return h + 120
+
+    H_content = max(sum(calculate_year_height(y) for y in YEARS_LEFT),
+                    sum(calculate_year_height(y) for y in YEARS_RIGHT))
+    H = 250 + H_content
+
+    img = Image.new('RGB', (W, H), color=COLOR_BG_LIGHT)
+    draw = ImageDraw.Draw(img)
+
+    y_cursor = 50
+    draw.text((W / 2, y_cursor), base_info['title'], fill=COLOR_TITLE_DARK, anchor="ms")
+    y_cursor += 70
+
+    draw.text((MARGIN, y_cursor), f"填表人: {base_info['writer']}", fill=COLOR_TEXT_DARK)
+    draw.text((W / 2, y_cursor), f"填寫時間: {base_info['date']}", fill=COLOR_TEXT_DARK, anchor="mt")
+    draw.text((W - MARGIN, y_cursor), f"製表人: {base_info['creator']}", fill=COLOR_TEXT_DARK, anchor="rt")
+
+    y_cursor += 50
+    draw.line((MARGIN, y_cursor, W - MARGIN, y_cursor), fill=COLOR_TITLE_DARK, width=2)
+    y_cursor += 40
+
+    def draw_year_records(years_list, x_start, y_start_initial):
+        y_cursor_col = y_start_initial
+        for year in years_list:
+            record = creative_records[year]
+            draw.text((x_start, y_cursor_col + 5), f"🌟 【 {year} 年 創作小結 】", fill=COLOR_HIGHLIGHT)
+            y_cursor_col += 80
+
+            for question, key in [
+                ("1. 本年我在寫：", "cp_work"),
+                ("2. 最能代表我本年風格的段落是：", "style_excerpt"),
+                ("3. 本年對我創作影響最大的事是：", "major_impact"),
+                ("4. 本年創作的總結感想是：", "reflection")
+            ]:
+                draw.text((x_start, y_cursor_col), question, fill=COLOR_HIGHLIGHT)
+                y_cursor_col += line_height
+                content = record[key] or "(暫無內容)"
+                lines = textwrap.wrap(content, width=int(TEXT_WIDTH/18), replace_whitespace=False)
+                for line in lines:
+                    draw.text((x_start + 10, y_cursor_col), line, fill=COLOR_TEXT_DARK)
+                    y_cursor_col += line_height
+                y_cursor_col += 20
+            draw.line((x_start + 50, y_cursor_col - 10, x_start + COLUMN_WIDTH - 50, y_cursor_col - 10), fill=COLOR_ACCENT_LINE, width=1)
+            y_cursor_col += 40
+
+    draw_year_records(YEARS_LEFT, MARGIN, y_cursor)
+    draw_year_records(YEARS_RIGHT, MARGIN + COLUMN_WIDTH + GUTTER, y_cursor)
+
+    center_x = MARGIN + COLUMN_WIDTH + GUTTER / 2
+    draw.line((center_x, y_cursor, center_x, H - 50), fill=COLOR_TEXT_DARK, width=2)
+
+    return img
+
+# Gradio UI 佈局 (同步 word.py 的結構)
+with gr.Blocks(
+    title="創作者十年變化總結表",
+    css=f"body {{ background-color: {COLOR_BG_LIGHT}; }}",
+    theme=gr.themes.Soft(primary_hue="stone", secondary_hue="gray")
+) as demo:
+    gr.Markdown(f"# <span style='color: {COLOR_TITLE_DARK};'>✍️ 創作者十年變化總結表</span>")
+    all_inputs = []
+
+    with gr.Tabs():
+        with gr.TabItem("📝 基礎信息"):
+            title_box = gr.Textbox(value="創作者十年變化總結表", label="標題")
+            creator_box = gr.Textbox(value="南極冰雕師", label="製表人")
+            writer_box = gr.Textbox(label="填表人", placeholder="您的名字")
+            date_box = gr.Textbox(label="時間", value=datetime.date.today().strftime("%Y年%m月%d日"))
+            all_inputs.extend([title_box, creator_box, writer_box, date_box])
+
+        for year in YEARS:
+            with gr.TabItem(f"✒️ {year} "):
+                c1 = gr.Textbox(label="1. 本年我在寫：", lines=2)
+                c2 = gr.Textbox(label="2. 風格段落：", lines=5)
+                c3 = gr.Textbox(label="3. 重大影響：", lines=2)
+                c4 = gr.Textbox(label="4. 總結感想：", lines=3)
+                all_inputs.extend([c1, c2, c3, c4])
+
+        with gr.TabItem("🖼️ 完成與導出"):
+            btn = gr.Button("生成十年總結圖", variant="primary")
+            output_image = gr.Image(label="十年總結", type="pil")
+
+    gr.Markdown("--- \n ### 💡 說明：\n 1. **數據安全**：頁面刷新會導致內容清空，請及時備份。\n 2. **靜態運行**：本頁面完全在您的瀏覽器中運行，無需伺服器。")
+    btn.click(generate_summary_image, inputs=all_inputs, outputs=output_image)
+
+demo.launch()
+        </gradio-file>
+    </gradio-lite>
+</body>
+</html>
