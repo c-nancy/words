@@ -17,7 +17,7 @@ COLOR_TITLE_DARK = '#121619'  # 标题和重要线条
 COLOR_ACCENT_LINE = '#BCB382'  # 年份标题边框/细分隔线
 COLOR_HIGHLIGHT = '#47340C'  # 年份标题和问题强调色
 
-FONT_PATH = "./font.ttf"
+FONT_PATH = "./scripts/font.ttf"
 
 
 # --- 核心图片生成函数 ---
@@ -116,18 +116,16 @@ def generate_summary_image(*args):
         for i, year in enumerate(years_list):
             record = creative_records[year]
 
-            # 修改点 1：去掉了绘制 COLOR_ALT_BG 交替背景色的逻辑
-
             draw.text((x_start, y_cursor_col + 5), f"🌟 【 {year} 年 创作小结 】", fill=COLOR_HIGHLIGHT, font=font_year)
 
             y_cursor_col += 50
             y_cursor_col += 30
 
             for question, key, color in [
-                ("(1) 本年我在写：", "cp_work", COLOR_HIGHLIGHT),
-                ("(2) 最能代表我本年风格的段落是：", "style_excerpt", COLOR_HIGHLIGHT),
-                ("(3) 本年对我创作影响最大的事是：", "major_impact", COLOR_HIGHLIGHT),
-                ("(4) 本年创作的总结感想是：", "reflection", COLOR_HIGHLIGHT)
+                ("1. 本年我在写：", "cp_work", COLOR_HIGHLIGHT),
+                ("2. 最能代表我本年风格的段落是：", "style_excerpt", COLOR_HIGHLIGHT),
+                ("3. 本年对我创作影响最大的事是：", "major_impact", COLOR_HIGHLIGHT),
+                ("4. 本年创作的总结感想是：", "reflection", COLOR_HIGHLIGHT)
             ]:
                 draw.text((x_start, y_cursor_col), question, fill=color, font=font_header)
                 y_cursor_col += line_height
@@ -174,7 +172,7 @@ with gr.Blocks(
 
     with gr.Tabs():
         with gr.TabItem("📝 基础信息"):
-            gr.Markdown("### 先在本页填写基本信息，随后切换到年份标签进行记录。")
+            gr.Markdown("### 先在本页填写基本信息，随后切换到年份标签完成每年内容。")
             title_box = gr.Textbox(value="创作者十年变化总结表", interactive=False, label="总结表标题")
             creator_box = gr.Textbox(label="制表人", interactive=False, value="南极冰雕师")
             writer_box = gr.Textbox(label="填表人", lines=1, placeholder="可选")
@@ -206,6 +204,3 @@ with gr.Blocks(
     """)
 
     generate_button.click(fn=generate_summary_image, inputs=all_inputs, outputs=output_image)
-
-if __name__ == "__main__":
-    app.launch()
