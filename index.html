@@ -36,10 +36,9 @@
 
         h1 { color: var(--title-dark); text-align: center; margin-bottom: 25px; font-size: 24px; }
 
-        /* 优化后的标签页：自动换行代替左右滑动 */
         .tabs {
             display: flex;
-            flex-wrap: wrap; /* 关键修改：允许换行 */
+            flex-wrap: wrap;
             gap: 5px;
             border-bottom: 2px solid var(--accent-line);
             margin-bottom: 20px;
@@ -71,7 +70,6 @@
         .form-group { margin-bottom: 15px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; color: var(--highlight); font-size: 14px; }
 
-        /* 只读字段样式 */
         input[readonly] {
             background-color: #f0f0f0;
             color: #777;
@@ -103,17 +101,16 @@
             margin: 10px 0;
         }
 
-        .btn-generate:hover { background-color: var(--title-dark); }
-
-        #preview-canvas {
+        /* 隐藏原始 Canvas，显示 IMG */
+        #preview-canvas { display: none; }
+        #final-image {
             width: 100%;
             height: auto;
             margin-top: 20px;
             border: 1px solid var(--accent-line);
-            display: none;
+            display: none; /* 初始隐藏 */
         }
 
-        /* 全局底部说明 */
         .footer-info {
             background: #fcfbf7;
             padding: 15px;
@@ -134,7 +131,7 @@
 
     <div class="tabs" id="tab-headers">
         <button class="tab-btn active" id="btn-base" onclick="showTab('base')">📝 基础信息</button>
-        </div>
+    </div>
 
     <div id="tab-contents">
         <div class="tab-content active" id="content-base">
@@ -157,9 +154,11 @@
         </div>
 
         <div class="tab-content" id="content-export">
-            <h3 style="color: var(--highlight); text-align:center;">确认所有年份已填写完毕</h3>
+            <h3 style="color: var(--highlight); text-align:center;">🖼️ 确认所有年份已填写完毕</h3>
             <button class="btn-generate" onclick="generateImage()">生成十年总结长图</button>
+
             <canvas id="preview-canvas"></canvas>
+            <img id="final-image" alt="生成的长图">
         </div>
     </div>
 
@@ -167,8 +166,8 @@
         <h3>💡 使用说明：</h3>
         1. <b>数据安全</b>：系统不会自动保存内容，请勿刷新网页，建议在本地备份长文本。<br>
         2. <b>内容留空</b>：若某项不填，导出图片时将自动显示“（暂无内容）”。<br>
-        3. <b>最佳效果</b>：建议“风格段落”控制在 150-300 字左右，以获得美观的排版。<br>
-        4. <b>图片保存</b>：生成后，PC端右键点击图片或手机端长按图片即可“另存为”保存。
+        3. <b>手机端保存</b>：点击“生成”后，<b>长按下方出现的图片</b>即可弹出系统菜单选择“保存到相册”。<br>
+        4. <b>最佳效果</b>：建议“风格段落”控制在 150-300 字左右，以获得美观的排版。
     </div>
 </div>
 
@@ -240,6 +239,7 @@
 
     function generateImage() {
         const canvas = document.getElementById('preview-canvas');
+        const imgDisplay = document.getElementById('final-image');
         const ctx = canvas.getContext('2d');
         const W = 1600;
         const MARGIN = 60;
@@ -266,14 +266,13 @@
         canvas.width = W;
         canvas.height = H;
 
+        // 绘制逻辑
         ctx.fillStyle = COLOR_BG;
         ctx.fillRect(0, 0, W, H);
-
         ctx.textAlign = "center";
         ctx.fillStyle = COLOR_TITLE;
         ctx.font = "bold 55px sans-serif";
         ctx.fillText(document.getElementById('main-title').value, W/2, 100);
-
         ctx.font = "22px sans-serif";
         ctx.fillStyle = COLOR_TEXT;
         ctx.textAlign = "left";
@@ -282,7 +281,6 @@
         ctx.fillText(`填写时间: ${document.getElementById('main-date').value}`, W/2, 160);
         ctx.textAlign = "right";
         ctx.fillText(`制表人: ${document.getElementById('main-creator').value}`, W - MARGIN, 160);
-
         ctx.strokeStyle = COLOR_TITLE;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(MARGIN, 195); ctx.lineTo(W - MARGIN, 195); ctx.stroke();
@@ -295,14 +293,12 @@
                 ctx.font = "bold 32px sans-serif";
                 ctx.fillText(`🌟 【 ${year} 年 创作小结 】`, startX, y + 40);
                 y += 85;
-
                 const qs = [
                     {l: "1. 本年我在写：", id: `q1-${year}`},
                     {l: "2. 风格段落：", id: `q2-${year}`},
                     {l: "3. 重大影响：", id: `q3-${year}`},
                     {l: "4. 总结感想：", id: `q4-${year}`}
                 ];
-
                 qs.forEach(q => {
                     ctx.fillStyle = COLOR_HIGHLIGHT;
                     ctx.font = "bold 24px sans-serif";
@@ -323,13 +319,19 @@
 
         drawCol(YEARS.slice(0, 5), MARGIN, 240);
         drawCol(YEARS.slice(5), MARGIN + COL_W + GUTTER, 240);
-
         ctx.strokeStyle = COLOR_TITLE;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(W/2, 240); ctx.lineTo(W/2, H - 80); ctx.stroke();
 
-        canvas.style.display = "block";
-        window.scrollTo({ top: canvas.offsetTop, behavior: 'smooth' });
+        // --- 核心改动：将 Canvas 导出为图片 ---
+        try {
+            const dataURL = canvas.toDataURL("image/png");
+            imgDisplay.src = dataURL;
+            imgDisplay.style.display = "block";
+            window.scrollTo({ top: imgDisplay.offsetTop, behavior: 'smooth' });
+        } catch (e) {
+            alert("生成图片失败，请尝试在电脑端操作。");
+        }
     }
 </script>
 
