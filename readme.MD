@@ -12,3 +12,4 @@
     └── word.py           # 核心逻辑实现（界面 UI 与图片生成）  
 
 ### 在线地址
+[huggingface在线页面](**https://huggingface.co/spaces/FrozenPenguin/words**)
