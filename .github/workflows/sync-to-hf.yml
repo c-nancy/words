@@ -11,8 +11,25 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          lfs: true
-      - name: Push to hub
+          lfs: true  # 保持开启以从 GitHub 获取字体文件
+
+      - name:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push -f https://FrozenPenguin:$HF_TOKEN@huggingface.co/spaces/FrozenPenguin/words master
+        run: |
+          # 配置 Git 临时身份
+          git config --global user.email "actions@github.com"
+          git config --global user.name "github-actions"
+          
+          # 从本地缓存中移除字体文件
+          git rm scripts/font.ttf || true
+          
+          # 创建一个不含字体的临时提交
+          git commit -m "Exclude font for HF deployment"
+          
+          # 获取当前分支名 (master 或 main)
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          
+          # 强制推送到 Hugging Face 的 main 分支
+          # 格式: git push -f <URL> 本地分支:远程分支
+          git push -f https://FrozenPenguin:$HF_TOKEN@huggingface.co/spaces/FrozenPenguin/words $CURRENT_BRANCH:main
