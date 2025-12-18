@@ -1,176 +1,337 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>创作者十年变化总结表</title>
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@gradio/lite/dist/static/gradio-lite.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gradio/lite/dist/static/style.css" />
     <style>
-        body { background-color: #F4F1EA; margin: 0; }
-        /* 确保加载动画居中 */
-        gradio-lite { min-height: 100vh; }
+        :root {
+            --bg-color: #F4F1EA;
+            --text-dark: #2D4739;
+            --title-dark: #121619;
+            --accent-line: #BCB382;
+            --highlight: #47340C;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+        }
+
+        h1 { color: var(--title-dark); text-align: center; margin-bottom: 25px; font-size: 24px; }
+
+        /* 优化后的标签页：自动换行代替左右滑动 */
+        .tabs {
+            display: flex;
+            flex-wrap: wrap; /* 关键修改：允许换行 */
+            gap: 5px;
+            border-bottom: 2px solid var(--accent-line);
+            margin-bottom: 20px;
+            padding-bottom: 5px;
+        }
+
+        .tab-btn {
+            padding: 8px 12px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            background: #fdfdfd;
+            color: var(--text-dark);
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 4px 4px 0 0;
+            transition: 0.2s;
+        }
+
+        .tab-btn.active {
+            border: 1px solid var(--accent-line);
+            border-bottom: 3px solid var(--highlight);
+            color: var(--highlight);
+            background: rgba(71, 52, 12, 0.05);
+        }
+
+        .tab-content { display: none; padding: 10px 0; }
+        .tab-content.active { display: block; }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; color: var(--highlight); font-size: 14px; }
+
+        /* 只读字段样式 */
+        input[readonly] {
+            background-color: #f0f0f0;
+            color: #777;
+            cursor: not-allowed;
+            border: 1px solid #ddd;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--accent-line);
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .btn-generate {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background-color: var(--highlight);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+
+        .btn-generate:hover { background-color: var(--title-dark); }
+
+        #preview-canvas {
+            width: 100%;
+            height: auto;
+            margin-top: 20px;
+            border: 1px solid var(--accent-line);
+            display: none;
+        }
+
+        /* 全局底部说明 */
+        .footer-info {
+            background: #fcfbf7;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px dashed var(--accent-line);
+            margin-top: 25px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .footer-info h3 { margin: 0 0 10px 0; color: var(--highlight); font-size: 15px; }
     </style>
 </head>
 <body>
-    <gradio-lite>
-        <gradio-requirements>
-            pillow
-        </gradio-requirements>
 
-        <gradio-file name="app.py" entrypoint>
-import gradio as gr
-from PIL import Image, ImageDraw, ImageFont
-import datetime
-import textwrap
-import io
-import os
-import urllib.request
+<div class="container">
+    <h1>✍️ 创作者十年变化总结表</h1>
 
-# --- 配置参数 ---
-YEARS = range(2016, 2026)
-YEARS_LEFT = YEARS[:5]
-YEARS_RIGHT = YEARS[5:]
-COLUMNS = 2
+    <div class="tabs" id="tab-headers">
+        <button class="tab-btn active" id="btn-base" onclick="showTab('base')">📝 基础信息</button>
+        </div>
 
-COLOR_BG_LIGHT = '#F4F1EA'
-COLOR_TEXT_DARK = '#2D4739'
-COLOR_TITLE_DARK = '#121619'
-COLOR_ACCENT_LINE = '#BCB382'
-COLOR_HIGHLIGHT = '#47340C'
+    <div id="tab-contents">
+        <div class="tab-content active" id="content-base">
+            <div class="form-group">
+                <label>总结表标题 (不可编辑)</label>
+                <input type="text" id="main-title" value="创作者十年变化总结表" readonly>
+            </div>
+            <div class="form-group">
+                <label>制表人 (不可编辑)</label>
+                <input type="text" id="main-creator" value="南极冰雕师" readonly>
+            </div>
+            <div class="form-group">
+                <label>填表人</label>
+                <input type="text" id="main-writer" placeholder="请输入您的笔名">
+            </div>
+            <div class="form-group">
+                <label>填写时间</label>
+                <input type="text" id="main-date">
+            </div>
+        </div>
 
-# --- 字体处理逻辑 ---
-# 请将下方链接中的 FrozenPenguin 替换为您真实的 GitHub 用户名
-FONT_URL = "https://raw.githubusercontent.com/c-nancy/words/master/scripts/font.ttf"
-FONT_PATH = "font.ttf"
+        <div class="tab-content" id="content-export">
+            <h3 style="color: var(--highlight); text-align:center;">确认所有年份已填写完毕</h3>
+            <button class="btn-generate" onclick="generateImage()">生成十年总结长图</button>
+            <canvas id="preview-canvas"></canvas>
+        </div>
+    </div>
 
-def get_font(size):
-    if not os.path.exists(FONT_PATH):
-        try:
-            # 在浏览器中静默下载字体文件
-            urllib.request.urlretrieve(FONT_URL, FONT_PATH)
-        except:
-            return ImageFont.load_default()
-    try:
-        return ImageFont.truetype(FONT_PATH, size)
-    except:
-        return ImageFont.load_default()
+    <div class="footer-info">
+        <h3>💡 使用说明：</h3>
+        1. <b>数据安全</b>：系统不会自动保存内容，请勿刷新网页，建议在本地备份长文本。<br>
+        2. <b>内容留空</b>：若某项不填，导出图片时将自动显示“（暂无内容）”。<br>
+        3. <b>最佳效果</b>：建议“风格段落”控制在 150-300 字左右，以获得美观的排版。<br>
+        4. <b>图片保存</b>：生成后，PC端右键点击图片或手机端长按图片即可“另存为”保存。
+    </div>
+</div>
 
-def generate_summary_image(*args):
-    base_info = {
-        "title": args[0], "creator": args[1], "writer": args[2], "date": args[3]
+<script>
+    const YEARS = Array.from({length: 10}, (_, i) => 2016 + i);
+    const COLOR_BG = '#F4F1EA';
+    const COLOR_TEXT = '#2D4739';
+    const COLOR_TITLE = '#121619';
+    const COLOR_ACCENT = '#BCB382';
+    const COLOR_HIGHLIGHT = '#47340C';
+
+    window.onload = () => {
+        document.getElementById('main-date').value = new Date().toLocaleDateString('zh-CN', {year:'numeric', month:'long', day:'numeric'});
+        const headers = document.getElementById('tab-headers');
+        const contents = document.getElementById('tab-contents');
+
+        YEARS.forEach(year => {
+            const btn = document.createElement('button');
+            btn.className = 'tab-btn';
+            btn.innerText = `${year}`;
+            btn.id = `btn-${year}`;
+            btn.onclick = () => showTab(year);
+            headers.appendChild(btn);
+
+            const div = document.createElement('div');
+            div.className = 'tab-content';
+            div.id = `content-${year}`;
+            div.innerHTML = `
+                <h3 style="color: var(--highlight); margin-top:0;">【 ${year} 年创作记录 】</h3>
+                <div class="form-group"><label>1. 本年我在写：</label><textarea id="q1-${year}" rows="2" placeholder="作品、CP等"></textarea></div>
+                <div class="form-group"><label>2. 最能代表本年风格的段落：</label><textarea id="q2-${year}" rows="6" placeholder="建议150-300字"></textarea></div>
+                <div class="form-group"><label>3. 本年对我影响最大的事：</label><textarea id="q3-${year}" rows="2"></textarea></div>
+                <div class="form-group"><label>4. 本年创作总结感想：</label><textarea id="q4-${year}" rows="3"></textarea></div>
+            `;
+            contents.insertBefore(div, document.getElementById('content-export'));
+        });
+
+        const exportBtn = document.createElement('button');
+        exportBtn.className = 'tab-btn';
+        exportBtn.innerText = '🖼️ 导出';
+        exportBtn.id = 'btn-export';
+        exportBtn.onclick = () => showTab('export');
+        headers.appendChild(exportBtn);
+    };
+
+    function showTab(id) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`btn-${id}`).classList.add('active');
+        document.getElementById(`content-${id}`).classList.add('active');
     }
-    creative_records = {}
-    data_start_index = 4
-    for i, year in enumerate(YEARS):
-        start = data_start_index + i * 4
-        creative_records[year] = {
-            "cp_work": args[start],
-            "style_excerpt": args[start + 1],
-            "major_impact": args[start + 2],
-            "reflection": args[start + 3],
+
+    function wrapText(ctx, text, maxWidth) {
+        const str = text || "(暂无内容)";
+        let lines = [];
+        let currentLine = "";
+        for (let char of str) {
+            let testLine = currentLine + char;
+            if (ctx.measureText(testLine).width > maxWidth) {
+                lines.push(currentLine);
+                currentLine = char;
+            } else {
+                currentLine = testLine;
+            }
         }
+        lines.push(currentLine);
+        return lines;
+    }
 
-    W, MARGIN, GUTTER = 1600, 50, 40
-    COLUMN_WIDTH = (W - 2 * MARGIN - GUTTER) // COLUMNS
-    TEXT_WIDTH = COLUMN_WIDTH - 40
+    function generateImage() {
+        const canvas = document.getElementById('preview-canvas');
+        const ctx = canvas.getContext('2d');
+        const W = 1600;
+        const MARGIN = 60;
+        const GUTTER = 50;
+        const COL_W = (W - 2 * MARGIN - GUTTER) / 2;
+        const TEXT_W = COL_W - 40;
+        const LINE_H = 32;
 
-    # 获取不同尺寸字体
-    f_title = get_font(55)
-    f_year = get_font(30)
-    f_header = get_font(25)
-    f_text = get_font(20)
+        const calcYearH = (year) => {
+            let h = 80;
+            ctx.font = "20px sans-serif";
+            const questions = [`q1-${year}`, `q2-${year}`, `q3-${year}`, `q4-${year}`];
+            questions.forEach(id => {
+                const lines = wrapText(ctx, document.getElementById(id).value, TEXT_W);
+                h += 35 + lines.length * LINE_H + 20;
+            });
+            return h + 60;
+        };
 
-    line_height = 32
+        let h_left = YEARS.slice(0, 5).reduce((acc, y) => acc + calcYearH(y), 0);
+        let h_right = YEARS.slice(5).reduce((acc, y) => acc + calcYearH(y), 0);
 
-    def get_text_height(text, font, max_width):
-        if not text: return line_height
-        # 浏览器环境下的字符宽度估算
-        chars_per_line = int(max_width / 20)
-        lines = textwrap.wrap(text, width=chars_per_line, replace_whitespace=False)
-        return len(lines) * line_height + 15
+        const H = 300 + Math.max(h_left, h_right) + 100;
+        canvas.width = W;
+        canvas.height = H;
 
-    def calculate_year_height(year):
-        record = creative_records[year]
-        h = 80 # 标题空间
-        h += get_text_height(record["cp_work"], f_text, TEXT_WIDTH) + 40
-        h += get_text_height(record["style_excerpt"], f_text, TEXT_WIDTH) + 40
-        h += get_text_height(record["major_impact"], f_text, TEXT_WIDTH) + 40
-        h += get_text_height(record["reflection"], f_text, TEXT_WIDTH) + 40
-        return h + 40
+        ctx.fillStyle = COLOR_BG;
+        ctx.fillRect(0, 0, W, H);
 
-    H_left = sum(calculate_year_height(y) for y in YEARS_LEFT)
-    H_right = sum(calculate_year_height(y) for y in YEARS_RIGHT)
-    H = 250 + max(H_left, H_right)
+        ctx.textAlign = "center";
+        ctx.fillStyle = COLOR_TITLE;
+        ctx.font = "bold 55px sans-serif";
+        ctx.fillText(document.getElementById('main-title').value, W/2, 100);
 
-    img = Image.new('RGB', (W, int(H)), color=COLOR_BG_LIGHT)
-    draw = ImageDraw.Draw(img)
+        ctx.font = "22px sans-serif";
+        ctx.fillStyle = COLOR_TEXT;
+        ctx.textAlign = "left";
+        ctx.fillText(`填表人: ${document.getElementById('main-writer').value || "未填写"}`, MARGIN, 160);
+        ctx.textAlign = "center";
+        ctx.fillText(`填写时间: ${document.getElementById('main-date').value}`, W/2, 160);
+        ctx.textAlign = "right";
+        ctx.fillText(`制表人: ${document.getElementById('main-creator').value}`, W - MARGIN, 160);
 
-    # 绘制页眉
-    draw.text((W/2, 80), base_info['title'], fill=COLOR_TITLE_DARK, anchor="ms", font=f_title)
-    draw.text((MARGIN, 150), f"填表人: {base_info['writer']}", fill=COLOR_TEXT_DARK, font=f_text)
-    draw.text((W/2, 150), f"填写时间: {base_info['date']}", fill=COLOR_TEXT_DARK, anchor="mt", font=f_text)
-    draw.text((W-MARGIN, 150), f"制表人: {base_info['creator']}", fill=COLOR_TEXT_DARK, anchor="rt", font=f_text)
-    draw.line((MARGIN, 180, W-MARGIN, 180), fill=COLOR_TITLE_DARK, width=2)
+        ctx.strokeStyle = COLOR_TITLE;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(MARGIN, 195); ctx.lineTo(W - MARGIN, 195); ctx.stroke();
 
-    def draw_col(years, x_start, y_start):
-        y = y_start
-        for year in years:
-            rec = creative_records[year]
-            draw.text((x_start, y), f"🌟 【 {year} 年 创作小结 】", fill=COLOR_HIGHLIGHT, font=f_year)
-            y += 60
-            for q, k in [("1. 本年我在写：", "cp_work"), ("2. 风格段落：", "style_excerpt"),
-                         ("3. 重大影响：", "major_impact"), ("4. 总结感想：", "reflection")]:
-                draw.text((x_start, y), q, fill=COLOR_HIGHLIGHT, font=f_header)
-                y += line_height
-                txt = rec[k] or "(暂无内容)"
-                lines = textwrap.wrap(txt, width=int(TEXT_WIDTH/20), replace_whitespace=False)
-                for line in lines:
-                    draw.text((x_start + 10, y), line, fill=COLOR_TEXT_DARK, font=f_text)
-                    y += line_height
-                y += 20
-            draw.line((x_start + 50, y, x_start + COLUMN_WIDTH - 50, y), fill=COLOR_ACCENT_LINE, width=1)
-            y += 50
+        const drawCol = (years, startX, startY) => {
+            let y = startY;
+            years.forEach(year => {
+                ctx.textAlign = "left";
+                ctx.fillStyle = COLOR_HIGHLIGHT;
+                ctx.font = "bold 32px sans-serif";
+                ctx.fillText(`🌟 【 ${year} 年 创作小结 】`, startX, y + 40);
+                y += 85;
 
-    draw_col(YEARS_LEFT, MARGIN, 220)
-    draw_col(YEARS_RIGHT, MARGIN + COLUMN_WIDTH + GUTTER, 220)
+                const qs = [
+                    {l: "1. 本年我在写：", id: `q1-${year}`},
+                    {l: "2. 风格段落：", id: `q2-${year}`},
+                    {l: "3. 重大影响：", id: `q3-${year}`},
+                    {l: "4. 总结感想：", id: `q4-${year}`}
+                ];
 
-    # 绘制中线
-    mid_x = MARGIN + COLUMN_WIDTH + GUTTER // 2
-    draw.line((mid_x, 220, mid_x, H - 50), fill=COLOR_TITLE_DARK, width=2)
+                qs.forEach(q => {
+                    ctx.fillStyle = COLOR_HIGHLIGHT;
+                    ctx.font = "bold 24px sans-serif";
+                    ctx.fillText(q.l, startX, y);
+                    y += 35;
+                    ctx.fillStyle = COLOR_TEXT;
+                    ctx.font = "20px sans-serif";
+                    const lines = wrapText(ctx, document.getElementById(q.id).value, TEXT_W);
+                    lines.forEach(line => { ctx.fillText(line, startX + 15, y); y += LINE_H; });
+                    y += 20;
+                });
+                ctx.strokeStyle = COLOR_ACCENT;
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(startX + 50, y); ctx.lineTo(startX + COL_W - 50, y); ctx.stroke();
+                y += 55;
+            });
+        };
 
-    return img
+        drawCol(YEARS.slice(0, 5), MARGIN, 240);
+        drawCol(YEARS.slice(5), MARGIN + COL_W + GUTTER, 240);
 
-with gr.Blocks(theme=gr.themes.Soft(primary_hue="stone")) as demo:
-    gr.Markdown("# ✍️ 创作者十年变化总结表")
+        ctx.strokeStyle = COLOR_TITLE;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(W/2, 240); ctx.lineTo(W/2, H - 80); ctx.stroke();
 
-    all_inputs = []
-    with gr.Tabs():
-        with gr.TabItem("📝 基础信息"):
-            t = gr.Textbox(value="创作者十年变化总结表", label="标题")
-            c = gr.Textbox(value="南极冰雕师", label="制表人")
-            w = gr.Textbox(label="填表人", placeholder="您的笔名")
-            d = gr.Textbox(value=datetime.date.today().strftime("%Y年%m月%d日"), label="日期")
-            all_inputs.extend([t, c, w, d])
+        canvas.style.display = "block";
+        window.scrollTo({ top: canvas.offsetTop, behavior: 'smooth' });
+    }
+</script>
 
-        for year in YEARS:
-            with gr.TabItem(f"{year}"):
-                all_inputs.extend([
-                    gr.Textbox(label="1. 本年我在写：", lines=2),
-                    gr.Textbox(label="2. 最能代表本年风格的段落：", lines=5),
-                    gr.Textbox(label="3. 本年对我影响最大的事：", lines=2),
-                    gr.Textbox(label="4. 本年创作总结感想：", lines=3)
-                ])
-
-        with gr.TabItem("🖼️ 完成与导出"):
-            btn = gr.Button("点击生成长图", variant="primary")
-            out = gr.Image(label="生成的图片 (右键另存为)", type="pil")
-
-    gr.Markdown("--- \n ### 💡 提示：页面刷新内容会消失，请注意备份。")
-    btn.click(generate_summary_image, inputs=all_inputs, outputs=out)
-
-demo.launch()
-        </gradio-file>
-    </gradio-lite>
 </body>
 </html>

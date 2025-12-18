@@ -12,4 +12,10 @@
     └── word.py           # 核心逻辑实现（界面 UI 与图片生成）  
 
 ### 在线地址
-[huggingface在线页面](**https://huggingface.co/spaces/FrozenPenguin/words**)
+[huggingface在线页面](https://huggingface.co/spaces/FrozenPenguin/words)
+
+
+### HTML版地址
+由于忽然发现一些朋友无法登录huggingface的问题，编辑了静态html版。
+静态html版与gradio版是两套代码，功能相同。  
+[GitHub Pages页面](https://c-nancy.github.io/words/)
