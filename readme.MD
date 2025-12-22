@@ -16,6 +16,6 @@
 
 
 ### HTML版地址
-由于忽然发现一些朋友无法登录huggingface的问题，编辑了静态html版。  
-静态html版与gradio版是两套代码，功能相同。  
+由于忽然发现一些朋友无法登录huggingface的问题，编辑增加了静态html版。  
+静态html版与gradio版是两套代码，功能基本相同。  
 [GitHub Pages页面](https://c-nancy.github.io/words/)

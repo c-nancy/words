@@ -3,21 +3,65 @@ from PIL import Image, ImageDraw, ImageFont
 import datetime
 import textwrap
 import io
+import os
 
 # --- 配置参数 (2016-2025) ---
-YEARS = range(2016, 2026)  # 包含 2016 到 2025 共 10 年
+YEARS = range(2016, 2026)
 YEARS_LEFT = YEARS[:5]
 YEARS_RIGHT = YEARS[5:]
 COLUMNS = 2
 
 # --- 优化后的配色方案 ---
-COLOR_BG_LIGHT = '#F4F1EA'  # 修改点 2：将主背景色修改为更浅的米白色
-COLOR_TEXT_DARK = '#2D4739'  # 正文和制表人信息
-COLOR_TITLE_DARK = '#121619'  # 标题和重要线条
-COLOR_ACCENT_LINE = '#BCB382'  # 年份标题边框/细分隔线
-COLOR_HIGHLIGHT = '#47340C'  # 年份标题和问题强调色
+COLOR_BG_LIGHT = '#F4F1EA'
+COLOR_TEXT_DARK = '#2D4739'
+COLOR_TITLE_DARK = '#121619'
+COLOR_ACCENT_LINE = '#BCB382'
+COLOR_HIGHLIGHT = '#47340C'
 
 FONT_PATH = "./scripts/font.ttf"
+
+
+# --- 辅助函数：处理换行并绘制文本 ---
+def draw_multiline_text(draw, text, start_x, start_y, font, fill, max_char_width=28, line_height=35):
+    """
+    处理原始文本中的换行符，并支持自动折行。
+    返回绘制完成后的结束 Y 坐标。
+    """
+    if not text:
+        draw.text((start_x, start_y), "(暂无内容)", font=font, fill=fill)
+        return start_y + line_height
+
+    # 首先按照用户输入的手动换行符拆分
+    paragraphs = text.split('\n')
+    current_y = start_y
+
+    for p in paragraphs:
+        if p.strip() == "":
+            current_y += line_height  # 保留空行
+            continue
+
+        # 对每一段进行自动折行
+        wrapped_lines = textwrap.wrap(p, width=max_char_width)
+        for line in wrapped_lines:
+            draw.text((start_x, current_y), line, font=font, fill=fill)
+            current_y += line_height
+
+    return current_y
+
+
+def calc_text_height(text, max_char_width=28, line_height=35):
+    """预计算包含换行符的文本高度"""
+    if not text:
+        return line_height
+    paragraphs = text.split('\n')
+    total_lines = 0
+    for p in paragraphs:
+        if p.strip() == "":
+            total_lines += 1
+        else:
+            wrapped_lines = textwrap.wrap(p, width=max_char_width)
+            total_lines += len(wrapped_lines)
+    return total_lines * line_height
 
 
 # --- 核心图片生成函数 ---
@@ -33,130 +77,91 @@ def generate_summary_image(*args):
         "date": args[3]
     }
 
-    creative_records = {}
-    data_start_index = 4
+    # 每一年的数据占据 args 的 4 个位置
+    years_data = {}
     for i, year in enumerate(YEARS):
-        start = data_start_index + i * 4
-        creative_records[year] = {
-            "cp_work": args[start],
-            "style_excerpt": args[start + 1],
-            "major_impact": args[start + 2],
-            "reflection": args[start + 3],
+        start_idx = 4 + i * 4
+        years_data[year] = {
+            "q1": args[start_idx],
+            "q2": args[start_idx + 1],
+            "q3": args[start_idx + 2],
+            "q4": args[start_idx + 3]
         }
 
-    # 2. 图片绘制配置
-    W = 1600
-    MARGIN = 50
-    GUTTER = 40
-    COLUMN_WIDTH = (W - 2 * MARGIN - GUTTER) // COLUMNS
-    TEXT_WIDTH = COLUMN_WIDTH - 40
-
+    # 2. 动态布局计算
     try:
         font_title = ImageFont.truetype(FONT_PATH, 55)
-        font_year = ImageFont.truetype(FONT_PATH, 30)
-        font_header = ImageFont.truetype(FONT_PATH, 25)
-        font_text = ImageFont.truetype(FONT_PATH, 20)
-        font_base = ImageFont.truetype(FONT_PATH, 20)
-    except IOError:
-        font_title = ImageFont.load_default()
-        font_year = ImageFont.load_default()
-        font_header = ImageFont.load_default()
-        font_text = ImageFont.load_default()
-        font_base = ImageFont.load_default()
+        font_subtitle = ImageFont.truetype(FONT_PATH, 22)
+        font_year = ImageFont.truetype(FONT_PATH, 32)
+        font_q = ImageFont.truetype(FONT_PATH, 24)
+        font_content = ImageFont.truetype(FONT_PATH, 20)
+    except:
+        font_title = font_subtitle = font_year = font_q = font_content = ImageFont.load_default()
 
-    line_height = 30
+    WIDTH = 1600
+    MARGIN = 60
+    GUTTER = 50
+    COLUMN_WIDTH = (WIDTH - 2 * MARGIN - GUTTER) // 2
 
-    def get_text_height(text, font, max_width):
-        if not text:
-            return line_height
-        chars_per_line = int(max_width / (font.size * 0.9))
-        lines = textwrap.wrap(text, width=chars_per_line, replace_whitespace=False)
-        return len(lines) * line_height + 15
+    def get_year_block_height(year_val):
+        h = 80  # 年份标题高度
+        data = years_data[year_val]
+        for q_key in ["q1", "q2", "q3", "q4"]:
+            h += 35  # 问题标题高度
+            h += calc_text_height(data[q_key]) + 20  # 文本内容高度 + 间距
+        return h + 60  # 模块底部留白
 
-    def calculate_year_height(year):
-        record = creative_records[year]
-        h = 0
-        h += 50
-        h += 30
-        h += 4 * line_height
-        h += get_text_height(record["cp_work"], font_text, TEXT_WIDTH)
-        h += get_text_height(record["style_excerpt"], font_text, TEXT_WIDTH)
-        h += get_text_height(record["major_impact"], font_text, TEXT_WIDTH)
-        h += get_text_height(record["reflection"], font_text, TEXT_WIDTH)
-        h += 4 * 20
-        h += 40
-        return h
+    left_h = sum(get_year_block_height(y) for y in YEARS_LEFT)
+    right_h = sum(get_year_block_height(y) for y in YEARS_RIGHT)
 
-    H_base = 200
-    H_left_content = sum(calculate_year_height(year) for year in YEARS_LEFT)
-    H_right_content = sum(calculate_year_height(year) for year in YEARS_RIGHT)
-    H_content = max(H_left_content, H_right_content)
-    H = H_base + H_content + 50
+    CONTENT_TOP = 240
+    H = CONTENT_TOP + max(left_h, right_h) + 100
 
-    img = Image.new('RGB', (W, H), color=COLOR_BG_LIGHT)
+    # 3. 开始绘图
+    img = Image.new('RGB', (WIDTH, H), COLOR_BG_LIGHT)
     draw = ImageDraw.Draw(img)
 
-    y_cursor = 50
-    title_text = base_info['title']
-    draw.text((W / 2, y_cursor), title_text, fill=COLOR_TITLE_DARK, anchor="ms", font=font_title)
-    y_cursor += 70
+    # 绘制顶栏
+    draw.text((WIDTH // 2, 80), base_info["title"], font=font_title, fill=COLOR_TITLE_DARK, anchor="mm")
+    draw.text((MARGIN, 160), f"填表人: {base_info['writer'] or '未填写'}", font=font_subtitle, fill=COLOR_TEXT_DARK)
+    draw.text((WIDTH // 2, 160), f"填写时间: {base_info['date']}", font=font_subtitle, fill=COLOR_TEXT_DARK,
+              anchor="mm")
+    draw.text((WIDTH - MARGIN, 160), f"制表人: {base_info['creator']}", font=font_subtitle, fill=COLOR_TEXT_DARK,
+              anchor="rm")
+    draw.line((MARGIN, 200, WIDTH - MARGIN, 200), fill=COLOR_TITLE_DARK, width=2)
 
-    draw.text((MARGIN, y_cursor), f"填表人: {base_info['writer']}", fill=COLOR_TEXT_DARK, font=font_base)
-    draw.text((W / 2, y_cursor), f"填写时间: {base_info['date']}", fill=COLOR_TEXT_DARK, anchor="mt", font=font_base)
-    draw.text((W - MARGIN, y_cursor), f"制表人: {base_info['creator']}", fill=COLOR_TEXT_DARK, anchor="rt",
-              font=font_base)
+    def draw_col(years_list, start_x, start_y):
+        y = start_y
+        for year in years_list:
+            # 绘制年份标题
+            draw.text((start_x, y + 20), f"🌟 【 {year} 年 创作小结 】", font=font_year, fill=COLOR_HIGHLIGHT)
+            y += 85
 
-    y_cursor += 50
-    draw.line((MARGIN, y_cursor, W - MARGIN, y_cursor), fill=COLOR_TITLE_DARK, width=2)
-    y_cursor += 40
+            data = years_data[year]
+            questions = [
+                ("1. 本年我在写：", data["q1"]),
+                ("2. 风格段落：", data["q2"]),
+                ("3. 重大影响：", data["q3"]),
+                ("4. 总结感想：", data["q4"])
+            ]
 
-    def draw_year_records(years_list, x_start, y_start_initial):
-        y_cursor_col = y_start_initial
+            for q_title, answer in questions:
+                draw.text((start_x, y), q_title, font=font_q, fill=COLOR_HIGHLIGHT)
+                y += 35
+                # 调用支持换行的绘制函数
+                y = draw_multiline_text(draw, answer, start_x + 15, y, font_content, COLOR_TEXT_DARK)
+                y += 20
 
-        for i, year in enumerate(years_list):
-            record = creative_records[year]
+            # 装饰线
+            draw.line((start_x + 50, y, start_x + COLUMN_WIDTH - 50, y), fill=COLOR_ACCENT_LINE, width=1)
+            y += 55
 
-            draw.text((x_start, y_cursor_col + 5), f"🌟 【 {year} 年 创作小结 】", fill=COLOR_HIGHLIGHT, font=font_year)
+    draw_col(YEARS_LEFT, MARGIN, CONTENT_TOP)
+    draw_col(YEARS_RIGHT, MARGIN + COLUMN_WIDTH + GUTTER, CONTENT_TOP)
 
-            y_cursor_col += 50
-            y_cursor_col += 30
-
-            for question, key, color in [
-                ("1. 本年我在写：", "cp_work", COLOR_HIGHLIGHT),
-                ("2. 最能代表我本年风格的段落是：", "style_excerpt", COLOR_HIGHLIGHT),
-                ("3. 本年对我创作影响最大的事是：", "major_impact", COLOR_HIGHLIGHT),
-                ("4. 本年创作的总结感想是：", "reflection", COLOR_HIGHLIGHT)
-            ]:
-                draw.text((x_start, y_cursor_col), question, fill=color, font=font_header)
-                y_cursor_col += line_height
-
-                content = record[key]
-                if content:
-                    chars_per_line = int(TEXT_WIDTH / (font_text.size * 0.9))
-                    lines = textwrap.wrap(content, width=chars_per_line, replace_whitespace=False)
-                    for line in lines:
-                        draw.text((x_start + 10, y_cursor_col), line, fill=COLOR_TEXT_DARK, font=font_text)
-                        y_cursor_col += line_height
-                else:
-                    draw.text((x_start + 10, y_cursor_col), "(暂无内容)", fill=COLOR_TEXT_DARK, font=font_text)
-                    y_cursor_col += line_height
-
-                y_cursor_col += 20
-
-            draw.line((x_start + 50, y_cursor_col - 10, x_start + COLUMN_WIDTH - 50, y_cursor_col - 10),
-                      fill=COLOR_ACCENT_LINE, width=1)
-            y_cursor_col += 40
-
-        return y_cursor_col
-
-    X_START_LEFT = MARGIN
-    X_START_RIGHT = MARGIN + COLUMN_WIDTH + GUTTER
-
-    draw_year_records(YEARS_LEFT, X_START_LEFT, y_cursor)
-    draw_year_records(YEARS_RIGHT, X_START_RIGHT, y_cursor)
-
-    center_x = X_START_LEFT + COLUMN_WIDTH + GUTTER / 2
-    draw.line((center_x, y_cursor, center_x, H - 50), fill=COLOR_TEXT_DARK, width=2)
+    # 绘制中央垂直分隔线
+    mid_x = MARGIN + COLUMN_WIDTH + (GUTTER // 2)
+    draw.line((mid_x, CONTENT_TOP, mid_x, H - 80), fill=COLOR_TITLE_DARK, width=2)
 
     return img
 
@@ -172,22 +177,21 @@ with gr.Blocks(
 
     with gr.Tabs():
         with gr.TabItem("📝 基础信息"):
-            gr.Markdown("### 先在本页填写基本信息，随后切换到年份标签完成每年内容。")
-            title_box = gr.Textbox(value="创作者十年变化总结表", interactive=False, label="总结表标题")
-            creator_box = gr.Textbox(label="制表人", interactive=False, value="南极冰雕师")
-            writer_box = gr.Textbox(label="填表人", lines=1, placeholder="可选")
-            date_box = gr.Textbox(label="填写时间", lines=1, value=datetime.date.today().strftime("%Y年%m月%d日"),
-                                  interactive=True)
-            all_inputs.extend([title_box, creator_box, writer_box, date_box])
+            with gr.Column():
+                title_box = gr.Textbox(label="总结表标题", value="创作者十年变化总结表", interactive=False)
+                creator_box = gr.Textbox(label="制表人", value="南极冰雕师", interactive=False)
+                writer_box = gr.Textbox(label="填表人", placeholder="请输入您的笔名")
+                date_box = gr.Textbox(label="填写时间", value=datetime.date.today().strftime("%Y年%m月%d日"))
+                all_inputs.extend([title_box, creator_box, writer_box, date_box])
 
         for year in YEARS:
-            with gr.TabItem(f"✒️ {year} "):
+            with gr.TabItem(f"✒️ {year}"):
                 gr.Markdown(f"### <span style='color: {COLOR_HIGHLIGHT};'>【 {year} 年创作记录 】</span>")
-                cp_work = gr.Textbox(label="1. 本年我在写（cp/作品……）：", lines=2)
-                style_excerpt = gr.Textbox(label="2. 最能代表我本年风格的段落是：", lines=8)
-                major_impact = gr.Textbox(label="3. 本年对我创作影响最大的事是：", lines=3)
-                reflection = gr.Textbox(label="4. 我对本年创作的总结感想是：", lines=5)
-                all_inputs.extend([cp_work, style_excerpt, major_impact, reflection])
+                q1 = gr.Textbox(label="1. 本年我在写（cp/作品……）：", lines=2)
+                q2 = gr.Textbox(label="2. 最能代表我本年风格的段落是：", lines=8)
+                q3 = gr.Textbox(label="3. 本年对我创作影响最大的事是：", lines=3)
+                q4 = gr.Textbox(label="4. 我对本年创作的总结感想是：", lines=5)
+                all_inputs.extend([q1, q2, q3, q4])
 
         with gr.TabItem("🖼️ 完成与导出"):
             gr.Markdown("### 确认所有内容已填写后，点击下方按钮生成最终长图。")
@@ -204,3 +208,6 @@ with gr.Blocks(
     """)
 
     generate_button.click(fn=generate_summary_image, inputs=all_inputs, outputs=output_image)
+
+if __name__ == "__main__":
+    app.launch()

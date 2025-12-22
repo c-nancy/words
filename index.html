@@ -101,14 +101,13 @@
             margin: 10px 0;
         }
 
-        /* 隐藏原始 Canvas，显示 IMG */
         #preview-canvas { display: none; }
         #final-image {
             width: 100%;
             height: auto;
             margin-top: 20px;
             border: 1px solid var(--accent-line);
-            display: none; /* 初始隐藏 */
+            display: none;
         }
 
         .footer-info {
@@ -156,7 +155,6 @@
         <div class="tab-content" id="content-export">
             <h3 style="color: var(--highlight); text-align:center;">🖼️ 确认所有年份已填写完毕</h3>
             <button class="btn-generate" onclick="generateImage()">生成十年总结长图</button>
-
             <canvas id="preview-canvas"></canvas>
             <img id="final-image" alt="生成的长图">
         </div>
@@ -164,10 +162,10 @@
 
     <div class="footer-info">
         <h3>💡 使用说明：</h3>
-        1. <b>数据安全</b>：系统不会自动保存内容，请勿刷新网页，建议在本地备份长文本。<br>
-        2. <b>内容留空</b>：若某项不填，导出图片时将自动显示“（暂无内容）”。<br>
-        3. <b>手机端保存</b>：点击“生成”后，<b>长按下方出现的图片</b>即可弹出系统菜单选择“保存到相册”。<br>
-        4. <b>最佳效果</b>：建议“风格段落”控制在 150-300 字左右，以获得美观的排版。
+        1. <b>分段支持</b>：文本框中输入的回车换行在导出图片时会被保留。<br>
+        2. <b>数据安全</b>：系统不会自动保存内容，请勿刷新网页，建议在本地备份长文本。<br>
+        3. <b>内容留空</b>：若某项不填，导出图片时将自动显示“（暂无内容）”。<br>
+        4. <b>图片保存</b>：生成后，手机端长按图片即可“保存到相册”。
     </div>
 </div>
 
@@ -197,8 +195,8 @@
             div.id = `content-${year}`;
             div.innerHTML = `
                 <h3 style="color: var(--highlight); margin-top:0;">【 ${year} 年创作记录 】</h3>
-                <div class="form-group"><label>1. 本年我在写：</label><textarea id="q1-${year}" rows="2" placeholder="作品、CP等"></textarea></div>
-                <div class="form-group"><label>2. 最能代表本年风格的段落：</label><textarea id="q2-${year}" rows="6" placeholder="建议150-300字"></textarea></div>
+                <div class="form-group"><label>1. 本年我在写：</label><textarea id="q1-${year}" rows="2"></textarea></div>
+                <div class="form-group"><label>2. 最能代表本年风格的段落：</label><textarea id="q2-${year}" rows="6"></textarea></div>
                 <div class="form-group"><label>3. 本年对我影响最大的事：</label><textarea id="q3-${year}" rows="2"></textarea></div>
                 <div class="form-group"><label>4. 本年创作总结感想：</label><textarea id="q4-${year}" rows="3"></textarea></div>
             `;
@@ -220,21 +218,31 @@
         document.getElementById(`content-${id}`).classList.add('active');
     }
 
+    // --- 修改点：增加对换行符的处理 ---
     function wrapText(ctx, text, maxWidth) {
         const str = text || "(暂无内容)";
-        let lines = [];
-        let currentLine = "";
-        for (let char of str) {
-            let testLine = currentLine + char;
-            if (ctx.measureText(testLine).width > maxWidth) {
-                lines.push(currentLine);
-                currentLine = char;
-            } else {
-                currentLine = testLine;
+        // 首先按用户输入的手动换行符拆分
+        const paragraphs = str.split('\n');
+        let finalLines = [];
+
+        paragraphs.forEach(p => {
+            if (p.trim() === "") {
+                finalLines.push(""); // 保留空行
+                return;
             }
-        }
-        lines.push(currentLine);
-        return lines;
+            let currentLine = "";
+            for (let char of p) {
+                let testLine = currentLine + char;
+                if (ctx.measureText(testLine).width > maxWidth) {
+                    finalLines.push(currentLine);
+                    currentLine = char;
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            finalLines.push(currentLine);
+        });
+        return finalLines;
     }
 
     function generateImage() {
@@ -262,17 +270,17 @@
         let h_left = YEARS.slice(0, 5).reduce((acc, y) => acc + calcYearH(y), 0);
         let h_right = YEARS.slice(5).reduce((acc, y) => acc + calcYearH(y), 0);
 
-        const H = 300 + Math.max(h_left, h_right) + 100;
+        const H = 300 + Math.max(h_left, h_right) + 120; // 额外增加底部缓冲空间
         canvas.width = W;
         canvas.height = H;
 
-        // 绘制逻辑
         ctx.fillStyle = COLOR_BG;
         ctx.fillRect(0, 0, W, H);
         ctx.textAlign = "center";
         ctx.fillStyle = COLOR_TITLE;
         ctx.font = "bold 55px sans-serif";
         ctx.fillText(document.getElementById('main-title').value, W/2, 100);
+
         ctx.font = "22px sans-serif";
         ctx.fillStyle = COLOR_TEXT;
         ctx.textAlign = "left";
@@ -281,6 +289,7 @@
         ctx.fillText(`填写时间: ${document.getElementById('main-date').value}`, W/2, 160);
         ctx.textAlign = "right";
         ctx.fillText(`制表人: ${document.getElementById('main-creator').value}`, W - MARGIN, 160);
+
         ctx.strokeStyle = COLOR_TITLE;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(MARGIN, 195); ctx.lineTo(W - MARGIN, 195); ctx.stroke();
@@ -307,7 +316,10 @@
                     ctx.fillStyle = COLOR_TEXT;
                     ctx.font = "20px sans-serif";
                     const lines = wrapText(ctx, document.getElementById(q.id).value, TEXT_W);
-                    lines.forEach(line => { ctx.fillText(line, startX + 15, y); y += LINE_H; });
+                    lines.forEach(line => {
+                        ctx.fillText(line, startX + 15, y);
+                        y += LINE_H;
+                    });
                     y += 20;
                 });
                 ctx.strokeStyle = COLOR_ACCENT;
@@ -319,18 +331,19 @@
 
         drawCol(YEARS.slice(0, 5), MARGIN, 240);
         drawCol(YEARS.slice(5), MARGIN + COL_W + GUTTER, 240);
+
         ctx.strokeStyle = COLOR_TITLE;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(W/2, 240); ctx.lineTo(W/2, H - 80); ctx.stroke();
 
-        // --- 核心改动：将 Canvas 导出为图片 ---
         try {
             const dataURL = canvas.toDataURL("image/png");
             imgDisplay.src = dataURL;
             imgDisplay.style.display = "block";
             window.scrollTo({ top: imgDisplay.offsetTop, behavior: 'smooth' });
         } catch (e) {
-            alert("生成图片失败，请尝试在电脑端操作。");
+            console.error(e);
+            alert("生成图片失败。");
         }
     }
 </script>
